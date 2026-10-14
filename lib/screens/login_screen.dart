@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../session.dart';
 import '../widgets/common.dart';
-import 'reset_password_screen.dart';
+import '../widgets/text_input_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,24 +39,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _editServer() async {
     final session = AppScope.read(context);
-    final controller = TextEditingController(text: session.baseUrl);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Server address'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.url,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'http://192.168.1.10:8080'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Save')),
-        ],
-      ),
+    final result = await showTextInputDialog(
+      context,
+      title: 'Server address',
+      hint: 'http://192.168.1.10:8080',
+      initialText: session.baseUrl,
+      confirmLabel: 'Save',
+      autofocus: true,
+      keyboardType: TextInputType.url,
     );
-    controller.dispose();
     if (result != null) {
       await session.setBaseUrl(result);
       if (mounted) setState(() {});
@@ -143,12 +134,12 @@ class _LoginScreenState extends State<LoginScreen> {
                               height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
                           : const Text('Sign in'),
                     ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
-                      ),
-                      child: const Text('Got a password reset link from HR?'),
+                    const SizedBox(height: 12),
+                    // Password set/reset happens on the web portal only.
+                    Text(
+                      'New here? Set your password using the link in your welcome email, then sign in.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 24),
                     Text(

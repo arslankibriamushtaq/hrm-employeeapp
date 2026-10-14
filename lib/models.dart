@@ -161,6 +161,7 @@ class WorkflowHistoryEntry {
 class LeaveWorkflow {
   LeaveWorkflow({
     this.status,
+    this.currentStageCode,
     this.currentStageName,
     this.currentStageApprover,
     this.escalated = false,
@@ -168,6 +169,7 @@ class LeaveWorkflow {
   });
 
   final String? status;
+  final String? currentStageCode;
   final String? currentStageName;
   final String? currentStageApprover;
   final bool escalated;
@@ -175,6 +177,7 @@ class LeaveWorkflow {
 
   factory LeaveWorkflow.fromJson(Json j) => LeaveWorkflow(
         status: toStr(j['status']),
+        currentStageCode: toStr(j['currentStageCode']),
         currentStageName: toStr(j['currentStageName']),
         currentStageApprover: toStr(j['currentStageApprover']),
         escalated: j['escalated'] == true,
@@ -182,6 +185,39 @@ class LeaveWorkflow {
             .map((e) => WorkflowHistoryEntry.fromJson(e as Json))
             .toList(),
       );
+}
+
+/// The applicant's current balance for a request's leave type (`quota` on a leave request).
+/// The request's own days are not deducted until its final approval.
+class RequestQuota {
+  RequestQuota({
+    this.year,
+    required this.totalQuota,
+    required this.usedQuota,
+    required this.remainingQuota,
+    this.pendingDays,
+    this.availableDays,
+  });
+
+  final int? year;
+  final int totalQuota;
+  final int usedQuota;
+  final int remainingQuota;
+  final int? pendingDays;
+  final int? availableDays;
+
+  factory RequestQuota.fromJson(Json j) {
+    final total = toInt(j['totalQuota']) ?? 0;
+    final used = toInt(j['usedQuota']) ?? 0;
+    return RequestQuota(
+      year: toInt(j['year']),
+      totalQuota: total,
+      usedQuota: used,
+      remainingQuota: toInt(j['remainingQuota']) ?? (total - used),
+      pendingDays: toInt(j['pendingDays']),
+      availableDays: toInt(j['availableDays']),
+    );
+  }
 }
 
 class LeaveRequest {
@@ -199,13 +235,16 @@ class LeaveRequest {
     this.reason,
     this.teamLeadStatus,
     this.teamLeadDecidedBy,
+    this.teamLeadDecidedAt,
     this.teamLeadNote,
     this.hrStatus,
     this.hrDecidedBy,
+    this.hrDecidedAt,
     this.hrNote,
     required this.overallStatus,
     this.createdAt,
     this.workflow,
+    this.quota,
   });
 
   final String id;
@@ -221,13 +260,18 @@ class LeaveRequest {
   final String? reason;
   final String? teamLeadStatus;
   final String? teamLeadDecidedBy;
+  final DateTime? teamLeadDecidedAt;
   final String? teamLeadNote;
   final String? hrStatus;
   final String? hrDecidedBy;
+  final DateTime? hrDecidedAt;
   final String? hrNote;
   final String overallStatus;
   final DateTime? createdAt;
   final LeaveWorkflow? workflow;
+
+  /// Null when the leave type has no quota (e.g. unpaid leave) or the key is absent.
+  final RequestQuota? quota;
 
   factory LeaveRequest.fromJson(Json j) => LeaveRequest(
         id: j['id'].toString(),
@@ -243,13 +287,16 @@ class LeaveRequest {
         reason: toStr(j['reason']),
         teamLeadStatus: toStr(j['teamLeadStatus']),
         teamLeadDecidedBy: toStr(j['teamLeadDecidedBy']),
+        teamLeadDecidedAt: parseDateTime(j['teamLeadDecidedAt']),
         teamLeadNote: toStr(j['teamLeadNote']),
         hrStatus: toStr(j['hrStatus']),
         hrDecidedBy: toStr(j['hrDecidedBy']),
+        hrDecidedAt: parseDateTime(j['hrDecidedAt']),
         hrNote: toStr(j['hrNote']),
         overallStatus: toStr(j['overallStatus']) ?? 'PENDING',
         createdAt: parseDateTime(j['createdAt']),
         workflow: j['workflow'] is Json ? LeaveWorkflow.fromJson(j['workflow'] as Json) : null,
+        quota: j['quota'] is Json ? RequestQuota.fromJson(j['quota'] as Json) : null,
       );
 }
 

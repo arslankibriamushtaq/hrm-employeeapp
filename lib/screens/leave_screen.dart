@@ -152,14 +152,32 @@ class _QuotaCard extends StatelessWidget {
   }
 }
 
+/// How an approver sees the applicant's balance. Null (the default) shows none, as on
+/// the employee's own Leave screen.
+enum BalanceView {
+  /// Still to decide: the request's days are compared with what is left.
+  pending,
+
+  /// Already decided: the balance is today's, not the one at decision time.
+  current,
+}
+
 /// Shared by My requests and Approvals.
 class LeaveRequestCard extends StatelessWidget {
-  const LeaveRequestCard({super.key, required this.request, this.onTap, this.showEmployee = false, this.footer});
+  const LeaveRequestCard({
+    super.key,
+    required this.request,
+    this.onTap,
+    this.showEmployee = false,
+    this.footer,
+    this.balance,
+  });
 
   final LeaveRequest request;
   final VoidCallback? onTap;
   final bool showEmployee;
   final Widget? footer;
+  final BalanceView? balance;
 
   @override
   Widget build(BuildContext context) {
@@ -203,10 +221,15 @@ class LeaveRequestCard extends StatelessWidget {
                     Text('$days working day${days == 1 ? '' : 's'}', style: TextStyle(color: muted)),
                 ],
               ),
-              if (request.overallStatus == 'PENDING' && request.workflow?.currentStageName != null) ...[
-                const SizedBox(height: 6),
-                Text('Waiting on: ${request.workflow!.currentStageName}',
-                    style: TextStyle(color: muted, fontSize: 13)),
+              const SizedBox(height: 8),
+              if (_hasTeamLeadStep(request)) ...[
+                _ApproverLine(role: 'Team lead', status: request.teamLeadStatus),
+                const SizedBox(height: 2),
+              ],
+              _ApproverLine(role: hrStageLabel(request), status: _hrStatus(request)),
+              if (balance case final view?) ...[
+                const SizedBox(height: 8),
+                _BalanceLine(request: request, view: view),
               ],
               if (footer != null) ...[const SizedBox(height: 12), footer!],
             ],
@@ -217,7 +240,8 @@ class LeaveRequestCard extends StatelessWidget {
   }
 }
 
-void showLeaveDetails(BuildContext context, LeaveRequest r) {
+/// [balance] is set only from the approvals screen; the employee's own sheet shows none.
+void showLeaveDetails(BuildContext context, LeaveRequest r, {BalanceView? balance}) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -245,6 +269,7 @@ void showLeaveDetails(BuildContext context, LeaveRequest r) {
           InfoRow('Paid', r.paid == null ? '—' : (r.paid! ? 'Yes' : 'No')),
           InfoRow('Applied on', fmtDateTime(r.createdAt)),
           if (r.reason != null && r.reason!.isNotEmpty) InfoRow('Reason', r.reason!),
+          if (balance != null) ..._balanceSection(context, r, balance),
           const SectionTitle('Approval progress'),
           ..._progress(r),
         ],
@@ -253,55 +278,149 @@ void showLeaveDetails(BuildContext context, LeaveRequest r) {
   );
 }
 
-/// WorkflowAction (APPROVE / REJECT / SKIP) -> the status vocabulary the chips use.
-String? _actionStatus(String? action) => switch (action) {
-      'APPROVE' => 'APPROVED',
-      'REJECT' => 'REJECTED',
-      'SKIP' => 'NOT_REQUIRED',
-      _ => action,
+// teamLeadStatus / hrStatus are the source of truth for approvals (the website reads the
+// same fields), whether or not the request has a workflow object.
+
+/// HR never sees a request the team lead rejected, but the backend leaves hrStatus PENDING.
+const _notReached = 'NOT_REACHED';
+
+/// Who the second approval belongs to. An HR employee's own request is escalated to
+/// SUPER_ADMIN, and `escalated` stays true after the decision; hrStatus still holds its state.
+String hrStageLabel(LeaveRequest r) => r.workflow?.escalated == true ? 'Super Admin' : 'HR';
+
+/// NOT_REQUIRED means the team lead step never applied (a team lead's or HR's own leave,
+/// or a team without a lead), so it is left out rather than shown as Skipped.
+bool _hasTeamLeadStep(LeaveRequest r) => r.teamLeadStatus != 'NOT_REQUIRED';
+
+String? _hrStatus(LeaveRequest r) =>
+    r.teamLeadStatus == 'REJECTED' && r.hrStatus == 'PENDING' ? _notReached : r.hrStatus;
+
+String _approvalLabel(String? status) => switch (status) {
+      'APPROVED' => 'Approved',
+      'PENDING' => 'Pending',
+      'REJECTED' => 'Rejected',
+      'NOT_REQUIRED' => 'Skipped',
+      _notReached => 'Not reached',
+      _ => humanize(status),
+    };
+
+/// Colours come from statusColor: APPROVED green, PENDING orange, REJECTED red, the rest grey.
+IconData _approvalIcon(String? status) => switch (status) {
+      'APPROVED' => Icons.check_circle,
+      'PENDING' => Icons.schedule,
+      'REJECTED' => Icons.cancel,
+      'NOT_REQUIRED' => Icons.remove_circle_outline,
+      _ => Icons.radio_button_unchecked,
     };
 
 List<Widget> _progress(LeaveRequest r) {
-  final history = r.workflow?.history ?? const <WorkflowHistoryEntry>[];
-  if (history.isNotEmpty || r.workflow != null) {
-    return [
-      for (final h in history)
-        _Step(
-          status: _actionStatus(h.action),
-          title: h.stageName ?? 'Step',
-          subtitle: [
-            humanize(_actionStatus(h.action)),
-            if (h.actorName != null) 'by ${h.actorName}',
-            if (h.actedAt != null) fmtDateTime(h.actedAt),
-          ].join(' · '),
-          note: h.note,
-        ),
-      if (r.overallStatus == 'PENDING')
-        _Step(
-          status: 'PENDING',
-          title: r.workflow?.currentStageName ?? 'Next approval',
-          subtitle: r.workflow?.currentStageApprover == null
-              ? 'Waiting for a decision'
-              : 'Waiting on ${r.workflow!.currentStageApprover}',
-        ),
-    ];
-  }
-  // Older requests decided outside the workflow engine: two fixed steps.
+  String decision(String? status, String? by, DateTime? at) => [
+        _approvalLabel(status),
+        if (by != null && by.isNotEmpty) 'by $by',
+        if (at != null) fmtDateTime(at),
+      ].join(' · ');
+
+  final hr = _hrStatus(r);
   return [
     _Step(
-      status: r.teamLeadStatus,
-      title: 'Team lead',
-      subtitle: [humanize(r.teamLeadStatus), if (r.teamLeadDecidedBy != null) 'by ${r.teamLeadDecidedBy}']
-          .join(' · '),
-      note: r.teamLeadNote,
+      status: 'APPROVED',
+      title: 'Submitted',
+      subtitle: r.createdAt == null ? 'Submitted' : fmtDateTime(r.createdAt),
     ),
+    if (_hasTeamLeadStep(r))
+      _Step(
+        status: r.teamLeadStatus,
+        title: 'Team lead',
+        subtitle: decision(r.teamLeadStatus, r.teamLeadDecidedBy, r.teamLeadDecidedAt),
+        note: r.teamLeadNote,
+      ),
     _Step(
-      status: r.hrStatus,
-      title: 'HR',
-      subtitle: [humanize(r.hrStatus), if (r.hrDecidedBy != null) 'by ${r.hrDecidedBy}'].join(' · '),
+      status: hr,
+      title: hrStageLabel(r),
+      subtitle: decision(hr, r.hrDecidedBy, r.hrDecidedAt),
       note: r.hrNote,
     ),
   ];
+}
+
+/// Only meaningful while pending: once approved the days are already deducted.
+bool _exceedsBalance(LeaveRequest r) {
+  final q = r.quota;
+  final days = r.totalDays;
+  return q != null && days != null && days > q.remainingQuota;
+}
+
+String _exceedsMessage(LeaveRequest r) =>
+    'Balance se zyada: ${r.totalDays} din maange, sirf ${r.quota!.remainingQuota} bache hain';
+
+List<Widget> _balanceSection(BuildContext context, LeaveRequest r, BalanceView view) {
+  final title = view == BalanceView.current ? 'Current balance' : 'Leave balance';
+  final q = r.quota;
+  if (q == null) return [SectionTitle(title), const InfoRow('Balance', 'No quota limit')];
+  final days = r.totalDays;
+  final error = Theme.of(context).colorScheme.error;
+  return [
+    SectionTitle(title),
+    InfoRow('Total', '${q.totalQuota} days'),
+    InfoRow('Used', '${q.usedQuota} days'),
+    InfoRow('Remaining', '${q.remainingQuota} days'),
+    if (view == BalanceView.pending) ...[
+      InfoRow('Is request ke din', days?.toString() ?? '—'),
+      InfoRow('Manzoori ke baad bachenge', days == null ? '—' : '${q.remainingQuota - days} days'),
+      if (_exceedsBalance(r))
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(_exceedsMessage(r), style: TextStyle(color: error, fontWeight: FontWeight.w600)),
+        ),
+    ],
+  ];
+}
+
+class _BalanceLine extends StatelessWidget {
+  const _BalanceLine({required this.request, required this.view});
+
+  final LeaveRequest request;
+  final BalanceView view;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final muted = TextStyle(color: scheme.onSurfaceVariant, fontSize: 13);
+    final q = request.quota;
+    if (q == null) return Text('No quota limit', style: muted);
+    final over = view == BalanceView.pending && _exceedsBalance(request);
+    final label = view == BalanceView.current
+        ? 'Current ${request.leaveTypeName} balance'
+        : '${request.leaveTypeName} balance';
+    final warn = TextStyle(color: scheme.error, fontSize: 13, fontWeight: FontWeight.w600);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label: ${q.remainingQuota} of ${q.totalQuota} days left', style: over ? warn : muted),
+        if (over) Text(_exceedsMessage(request), style: warn),
+      ],
+    );
+  }
+}
+
+class _ApproverLine extends StatelessWidget {
+  const _ApproverLine({required this.role, required this.status});
+
+  final String role;
+  final String? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = statusColor(status);
+    return Row(
+      children: [
+        Icon(_approvalIcon(status), size: 16, color: color),
+        const SizedBox(width: 6),
+        Text('$role: ', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+        Text(_approvalLabel(status), style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
+      ],
+    );
+  }
 }
 
 class _Step extends StatelessWidget {
@@ -314,26 +433,21 @@ class _Step extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = statusColor(status);
-    final icon = switch (status) {
-      'APPROVED' => Icons.check_circle,
-      'REJECTED' => Icons.cancel,
-      'NOT_REQUIRED' => Icons.remove_circle_outline,
-      _ => Icons.schedule,
-    };
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final notReached = status == _notReached;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color),
+          Icon(_approvalIcon(status), color: statusColor(status)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: notReached ? muted : null)),
+                Text(subtitle, style: TextStyle(color: muted)),
                 if (note != null && note!.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(top: 6),

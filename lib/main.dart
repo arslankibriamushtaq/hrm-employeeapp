@@ -48,7 +48,7 @@ class _EmployeeAppState extends State<EmployeeApp> {
   ThemeData _theme(Brightness brightness) => ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3F51B5), brightness: brightness),
-        cardTheme: const CardTheme(
+        cardTheme: const CardThemeData(
           elevation: 0,
           margin: EdgeInsets.zero,
           clipBehavior: Clip.antiAlias,

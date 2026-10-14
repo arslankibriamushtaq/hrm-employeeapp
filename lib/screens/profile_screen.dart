@@ -5,8 +5,29 @@ import 'approvals_screen.dart';
 import 'holidays_screen.dart';
 import 'notifications_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  /// Null (entry hidden) until the backend answers, and on any failure. Kept only in this
+  /// State, which HomeShell recreates every time the tab opens and drops on sign-out, so
+  /// a role change or another account never sees a stale entry.
+  ApproverKind? _approver;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkApprover();
+  }
+
+  Future<void> _checkApprover() async {
+    final kind = await approverKind(AppScope.read(context));
+    if (mounted) setState(() => _approver = kind);
+  }
 
   Future<void> _confirmLogout(BuildContext context) async {
     final ok = await showDialog<bool>(
@@ -76,13 +97,14 @@ class ProfileScreen extends StatelessWidget {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _push(context, const NotificationsScreen()),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.how_to_reg_outlined),
-                  title: const Text('Team approvals'),
-                  subtitle: const Text('For team leads'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _push(context, const ApprovalsScreen()),
-                ),
+                if (_approver case final approver?)
+                  ListTile(
+                    leading: const Icon(Icons.how_to_reg_outlined),
+                    title: Text(approver.title),
+                    subtitle: Text(approver.subtitle),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _push(context, ApprovalsScreen(kind: approver)),
+                  ),
                 ListTile(
                   leading: const Icon(Icons.celebration_outlined),
                   title: const Text('Public holidays'),
@@ -111,7 +133,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'To change your password, use the reset link HR sends you.',
+            'To change your password, please contact HR.',
             textAlign: TextAlign.center,
             style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
           ),

@@ -14,6 +14,7 @@ class _DashboardData {
   Attendance? today;
   List<Attendance> thisMonth = [];
   List<LeaveQuota> quotas = [];
+  ApproverKind? approver;
   int pendingApprovals = 0;
   int unread = 0;
   List<Holiday> upcomingHolidays = [];
@@ -46,22 +47,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final data = _DashboardData();
 
     await Future.wait([
+      // The backend returns the whole history; today's row (if any) is picked out here.
+      // No row for today is a normal state, not an error.
       api.myAttendance().then((rows) {
         data.thisMonth = rows.where((r) => r.date.year == now.year && r.date.month == now.month).toList();
         for (final r in rows) {
           if (isSameDay(r.date, now)) data.today = r;
         }
       }).catchError((Object e) {
+        debugPrint('Dashboard: attendance failed: $e');
         data.attendanceError = e.toString();
       }),
-      api.myQuotas(now.year).then((q) => data.quotas = q).catchError((Object _) => <LeaveQuota>[]),
-      api.pendingApprovals().then((p) => data.pendingApprovals = p.length).catchError((Object _) => 0),
-      api.unreadCount().then((c) => data.unread = c).catchError((Object _) => 0),
+      api.myQuotas(now.year).then((q) => data.quotas = q).catchError((Object e) {
+        debugPrint('Dashboard: leave quotas failed: $e');
+        return <LeaveQuota>[];
+      }),
+      // Same rule as the Profile entry: only HR / team leads get the "waiting for you"
+      // card, and others never call the pending list.
+      approverKind(AppScope.read(context)).then((kind) async {
+        data.approver = kind;
+        if (kind != null) data.pendingApprovals = (await api.pendingApprovals()).length;
+      }).catchError((Object e) {
+        debugPrint('Dashboard: approval access / pending approvals failed: $e');
+      }),
+      api.unreadCount().then((c) => data.unread = c).catchError((Object e) {
+        debugPrint('Dashboard: unread count failed: $e');
+        return 0;
+      }),
       api.holidays().then((h) {
         final today = DateTime(now.year, now.month, now.day);
         data.upcomingHolidays = h.where((x) => !x.date.isBefore(today)).toList()
           ..sort((a, b) => a.date.compareTo(b.date));
-      }).catchError((Object _) {}),
+      }).catchError((Object e) {
+        debugPrint('Dashboard: holidays failed: $e');
+      }),
     ]);
     return data;
   }
@@ -125,7 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
               _TodayCard(data: data, onTap: () => widget.onOpenTab(Tabs.attendance)),
-              if (data.pendingApprovals > 0) ...[
+              if (data.approver case final approver? when data.pendingApprovals > 0) ...[
                 const SizedBox(height: 12),
                 Card(
                   color: Theme.of(context).colorScheme.tertiaryContainer,
@@ -135,7 +154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'waiting for you'),
                     subtitle: const Text('Review your team\'s requests'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _open(const ApprovalsScreen()),
+                    onTap: () => _open(ApprovalsScreen(kind: approver)),
                   ),
                 ),
               ],
@@ -220,7 +239,7 @@ class _TodayCard extends StatelessWidget {
     if (data.attendanceError != null) {
       status = 'Could not load attendance';
     } else if (today == null) {
-      status = 'No attendance recorded yet today';
+      status = 'No attendance record for today yet';
     } else if (today.checkOut == null) {
       status = 'Checked in';
     } else {
