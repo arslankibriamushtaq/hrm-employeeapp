@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/brand.dart';
+
 /// Single-field input dialog. Returns the entered text, or null when cancelled.
 ///
 /// The dialog owns its controller and form key and disposes them in its own
@@ -15,6 +17,7 @@ Future<String?> showTextInputDialog(
   String initialText = '',
   String confirmLabel = 'OK',
   bool destructive = false,
+  Color? confirmColor,
   bool autofocus = false,
   int maxLines = 1,
   int? maxLength,
@@ -31,6 +34,7 @@ Future<String?> showTextInputDialog(
       initialText: initialText,
       confirmLabel: confirmLabel,
       destructive: destructive,
+      confirmColor: confirmColor,
       autofocus: autofocus,
       maxLines: maxLines,
       maxLength: maxLength,
@@ -49,6 +53,7 @@ class _TextInputDialog extends StatefulWidget {
     required this.initialText,
     required this.confirmLabel,
     required this.destructive,
+    required this.confirmColor,
     required this.autofocus,
     required this.maxLines,
     required this.maxLength,
@@ -63,6 +68,9 @@ class _TextInputDialog extends StatefulWidget {
   final String initialText;
   final String confirmLabel;
   final bool destructive;
+
+  /// Overrides the confirm button colour (e.g. green for Approve); [destructive] wins.
+  final Color? confirmColor;
   final bool autofocus;
   final int maxLines;
   final int? maxLength;
@@ -122,7 +130,9 @@ class _TextInputDialogState extends State<_TextInputDialog> {
         FilledButton(
           style: widget.destructive
               ? FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error)
-              : null,
+              : widget.confirmColor == null
+                  ? null
+                  : FilledButton.styleFrom(backgroundColor: widget.confirmColor, foregroundColor: AppColors.white),
           onPressed: _confirm,
           child: Text(widget.confirmLabel),
         ),

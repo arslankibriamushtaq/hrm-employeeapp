@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../models.dart';
 import '../session.dart';
+import '../theme/brand.dart';
 import '../widgets/common.dart';
 import '../widgets/text_input_dialog.dart';
 import 'leave_screen.dart';
@@ -226,6 +227,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         label: approve ? 'Note (optional)' : 'Reason for rejection',
         confirmLabel: approve ? 'Approve' : 'Reject',
         destructive: !approve,
+        confirmColor: approve ? AppColors.approved : null,
         autofocus: !approve,
         maxLines: 3,
         maxLength: 500,
@@ -281,15 +283,22 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
                                     icon: const Icon(Icons.close),
                                     label: const Text('Reject'),
                                     style: OutlinedButton.styleFrom(
-                                        foregroundColor: Theme.of(context).colorScheme.error),
+                                      foregroundColor: Theme.of(context).colorScheme.error,
+                                      side: BorderSide(color: Theme.of(context).colorScheme.error),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
+                                  // Green, not the brand red, so Approve never reads as Reject.
                                   child: FilledButton.icon(
                                     onPressed: () => _decide(r, true),
                                     icon: const Icon(Icons.check),
                                     label: const Text('Approve'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: AppColors.approved,
+                                      foregroundColor: AppColors.white,
+                                    ),
                                   ),
                                 ),
                               ],

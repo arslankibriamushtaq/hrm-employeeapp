@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../session.dart';
+import '../widgets/brand_logo.dart';
 import '../widgets/common.dart';
 import '../widgets/text_input_dialog.dart';
 
@@ -78,12 +79,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    CircleAvatar(
-                      radius: 36,
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      child: Icon(Icons.badge_outlined, size: 36, color: theme.colorScheme.onPrimaryContainer),
-                    ),
                     const SizedBox(height: 16),
+                    const Center(child: BrandLogo(width: 220)),
+                    const SizedBox(height: 28),
                     Text('Welcome back',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),

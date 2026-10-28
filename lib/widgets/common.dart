@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/brand.dart';
 import '../utils/format.dart';
 
 void showSnack(BuildContext context, String message, {bool error = false}) {
@@ -18,15 +19,15 @@ Color statusColor(String? status) {
   switch (status) {
     case 'APPROVED':
     case 'PRESENT':
-      return Colors.green.shade700;
+      return AppColors.approved;
     case 'REJECTED':
     case 'ABSENT':
-      return Colors.red.shade700;
+      return AppColors.rejected;
     case 'PENDING':
     case 'IN_PROGRESS':
-      return Colors.orange.shade800;
+      return AppColors.pending;
     default:
-      return Colors.blueGrey;
+      return AppColors.neutral;
   }
 }
 
@@ -42,7 +43,7 @@ class StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

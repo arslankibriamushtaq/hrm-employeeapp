@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../session.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
+import '../widgets/home_header.dart';
 import 'apply_leave_screen.dart';
 import 'approvals_screen.dart';
 import 'holidays_screen.dart';
@@ -108,117 +110,124 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = AppScope.of(context).user;
     final name = (user?.email ?? '').split('@').first;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_greeting(), style: Theme.of(context).textTheme.bodySmall),
-            Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-          ],
-        ),
-        actions: [
-          FutureBuilder<_DashboardData>(
-            future: _future,
-            builder: (context, snap) {
-              final unread = snap.data?.unread ?? 0;
-              return IconButton(
-                tooltip: 'Notifications',
-                onPressed: () => _open(const NotificationsScreen()),
-                icon: Badge(
-                  isLabelVisible: unread > 0,
-                  label: Text('$unread'),
-                  child: const Icon(Icons.notifications_outlined),
-                ),
-              );
-            },
+    final bell = FutureBuilder<_DashboardData>(
+      future: _future,
+      builder: (context, snap) {
+        final unread = snap.data?.unread ?? 0;
+        return IconButton(
+          tooltip: 'Notifications',
+          onPressed: () => _open(const NotificationsScreen()),
+          icon: Badge(
+            isLabelVisible: unread > 0,
+            label: Text('$unread'),
+            child: const Icon(Icons.notifications_outlined),
           ),
-        ],
-      ),
-      body: AsyncBody<_DashboardData>(
-        future: _future,
-        onRetry: _refresh,
-        builder: (context, data) => RefreshIndicator(
-          onRefresh: _refresh,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        );
+      },
+    );
+
+    // No AppBar: the two-line header sizes itself, so a large text scale cannot overflow
+    // a fixed toolbar height. Dark status-bar icons, as the AppBar gave on white.
+    return Scaffold(
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.dark,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
             children: [
-              _TodayCard(data: data, onTap: () => widget.onOpenTab(Tabs.attendance)),
-              if (data.approver case final approver? when data.pendingApprovals > 0) ...[
-                const SizedBox(height: 12),
-                Card(
-                  color: Theme.of(context).colorScheme.tertiaryContainer,
-                  child: ListTile(
-                    leading: const Icon(Icons.how_to_reg_outlined),
-                    title: Text('${data.pendingApprovals} leave request${data.pendingApprovals == 1 ? '' : 's'} '
-                        'waiting for you'),
-                    subtitle: const Text('Review your team\'s requests'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _open(ApprovalsScreen(kind: approver)),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _QuickAction(
-                      icon: Icons.add_circle_outline,
-                      label: 'Apply leave',
-                      onTap: () => _open(const ApplyLeaveScreen()),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _QuickAction(
-                      icon: Icons.event_available_outlined,
-                      label: 'Holidays',
-                      onTap: () => _open(const HolidaysScreen()),
-                    ),
-                  ),
-                ],
-              ),
-              SectionTitle('This month', trailing: Text(fmtMonth(DateTime.now()))),
-              _MonthStats(rows: data.thisMonth),
-              SectionTitle(
-                'Leave balance ${DateTime.now().year}',
-                trailing: TextButton(onPressed: () => widget.onOpenTab(Tabs.leave), child: const Text('View all')),
-              ),
-              if (data.quotas.isEmpty)
-                const Card(
-                  child: ListTile(
-                    leading: Icon(Icons.info_outline),
-                    title: Text('No leave balance assigned yet'),
-                    subtitle: Text('Contact HR if you think this is wrong.'),
-                  ),
-                )
-              else
-                SizedBox(
-                  height: 112,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: data.quotas.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, i) => _QuotaTile(quota: data.quotas[i]),
-                  ),
-                ),
-              if (data.upcomingHolidays.isNotEmpty) ...[
-                const SectionTitle('Upcoming holidays'),
-                Card(
-                  child: Column(
-                    children: [
-                      for (final h in data.upcomingHolidays.take(3))
-                        ListTile(
-                          leading: const Icon(Icons.celebration_outlined),
-                          title: Text(h.name),
-                          subtitle: Text(fmtShortDate(h.date)),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
+              HomeHeader(greeting: _greeting(), name: name, trailing: bell),
+              Expanded(child: _buildBody()),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    return AsyncBody<_DashboardData>(
+      future: _future,
+      onRetry: _refresh,
+      builder: (context, data) => RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            _TodayCard(data: data, onTap: () => widget.onOpenTab(Tabs.attendance)),
+            if (data.approver case final approver? when data.pendingApprovals > 0) ...[
+              const SizedBox(height: 12),
+              Card(
+                color: Theme.of(context).colorScheme.tertiaryContainer,
+                child: ListTile(
+                  leading: const Icon(Icons.how_to_reg_outlined),
+                  title: Text('${data.pendingApprovals} leave request${data.pendingApprovals == 1 ? '' : 's'} '
+                      'waiting for you'),
+                  subtitle: const Text('Review your team\'s requests'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _open(ApprovalsScreen(kind: approver)),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickAction(
+                    icon: Icons.add_circle_outline,
+                    label: 'Apply leave',
+                    onTap: () => _open(const ApplyLeaveScreen()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _QuickAction(
+                    icon: Icons.event_available_outlined,
+                    label: 'Holidays',
+                    onTap: () => _open(const HolidaysScreen()),
+                  ),
+                ),
+              ],
+            ),
+            SectionTitle('This month', trailing: Text(fmtMonth(DateTime.now()))),
+            _MonthStats(rows: data.thisMonth),
+            SectionTitle(
+              'Leave balance ${DateTime.now().year}',
+              trailing: TextButton(onPressed: () => widget.onOpenTab(Tabs.leave), child: const Text('View all')),
+            ),
+            if (data.quotas.isEmpty)
+              const Card(
+                child: ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('No leave balance assigned yet'),
+                  subtitle: Text('Contact HR if you think this is wrong.'),
+                ),
+              )
+            else
+              SizedBox(
+                height: 112,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: data.quotas.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, i) => _QuotaTile(quota: data.quotas[i]),
+                ),
+              ),
+            if (data.upcomingHolidays.isNotEmpty) ...[
+              const SectionTitle('Upcoming holidays'),
+              Card(
+                child: Column(
+                  children: [
+                    for (final h in data.upcomingHolidays.take(3))
+                      ListTile(
+                        leading: const Icon(Icons.celebration_outlined),
+                        title: Text(h.name),
+                        subtitle: Text(fmtShortDate(h.date)),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -301,7 +310,7 @@ class _TimeBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: color.withOpacity(0.75), fontSize: 12)),
+          Text(label, style: TextStyle(color: color.withValues(alpha: 0.75), fontSize: 12)),
           const SizedBox(height: 2),
           Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 16)),
         ],

@@ -175,7 +175,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     final n = items[i];
                     return ListTile(
                       onTap: () => _onTap(n),
-                      tileColor: n.read ? null : scheme.primaryContainer.withOpacity(0.35),
+                      tileColor: n.read ? null : scheme.primaryContainer.withValues(alpha: 0.35),
                       leading: CircleAvatar(
                         backgroundColor: n.read ? scheme.surfaceContainerHighest : scheme.primary,
                         child: Icon(

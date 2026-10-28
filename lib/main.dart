@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
 import 'session.dart';
+import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,17 +46,6 @@ class _EmployeeAppState extends State<EmployeeApp> {
     _wasLoggedIn = loggedIn;
   }
 
-  ThemeData _theme(Brightness brightness) => ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3F51B5), brightness: brightness),
-        cardTheme: const CardThemeData(
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          clipBehavior: Clip.antiAlias,
-        ),
-        inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
-      );
-
   @override
   Widget build(BuildContext context) {
     return AppScope(
@@ -64,8 +54,8 @@ class _EmployeeAppState extends State<EmployeeApp> {
         title: 'HR Employee',
         debugShowCheckedModeBanner: false,
         navigatorKey: _navigatorKey,
-        theme: _theme(Brightness.light),
-        darkTheme: _theme(Brightness.dark),
+        // Light only: the MYTM theme has no dark variant.
+        theme: buildAppTheme(),
         home: ListenableBuilder(
           listenable: widget.session,
           builder: (context, _) =>
