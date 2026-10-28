@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../session.dart';
+import '../theme/brand.dart';
+import '../theme/tokens.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
 import '../widgets/home_header.dart';
@@ -148,27 +150,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return AsyncBody<_DashboardData>(
       future: _future,
       onRetry: _refresh,
+      skeleton: const _HomeSkeleton(),
       builder: (context, data) => RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xl),
           children: [
             _TodayCard(data: data, onTap: () => widget.onOpenTab(Tabs.attendance)),
             if (data.approver case final approver? when data.pendingApprovals > 0) ...[
-              const SizedBox(height: 12),
-              Card(
-                color: Theme.of(context).colorScheme.tertiaryContainer,
-                child: ListTile(
-                  leading: const Icon(Icons.how_to_reg_outlined),
-                  title: Text('${data.pendingApprovals} leave request${data.pendingApprovals == 1 ? '' : 's'} '
-                      'waiting for you'),
-                  subtitle: const Text('Review your team\'s requests'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _open(ApprovalsScreen(kind: approver)),
+              const SizedBox(height: Space.md),
+              AppCard(
+                onTap: () => _open(ApprovalsScreen(kind: approver)),
+                child: Row(
+                  children: [
+                    const IconBubble(Icons.how_to_reg_outlined, color: AppColors.pending),
+                    const SizedBox(width: Space.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${data.pendingApprovals} leave request${data.pendingApprovals == 1 ? '' : 's'} '
+                            'waiting for you',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 2),
+                          Text('Review your team\'s requests',
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ],
                 ),
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: Space.md),
             Row(
               children: [
                 Expanded(
@@ -178,7 +195,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () => _open(const ApplyLeaveScreen()),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: Space.md),
                 Expanded(
                   child: _QuickAction(
                     icon: Icons.event_available_outlined,
@@ -188,14 +205,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ],
             ),
-            SectionTitle('This month', trailing: Text(fmtMonth(DateTime.now()))),
+            SectionHeader(
+              'This month',
+              trailing: Text(fmtMonth(DateTime.now()),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            ),
             _MonthStats(rows: data.thisMonth),
-            SectionTitle(
+            SectionHeader(
               'Leave balance ${DateTime.now().year}',
               trailing: TextButton(onPressed: () => widget.onOpenTab(Tabs.leave), child: const Text('View all')),
             ),
             if (data.quotas.isEmpty)
-              const Card(
+              const AppCard(
+                padding: EdgeInsets.zero,
                 child: ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text('No leave balance assigned yet'),
@@ -203,26 +225,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               )
             else
-              SizedBox(
-                height: 112,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: data.quotas.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, i) => _QuotaTile(quota: data.quotas[i]),
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    for (var i = 0; i < data.quotas.length; i++) ...[
+                      if (i > 0) const Divider(indent: Space.lg, endIndent: Space.lg),
+                      _QuotaRow(quota: data.quotas[i]),
+                    ],
+                  ],
                 ),
               ),
             if (data.upcomingHolidays.isNotEmpty) ...[
-              const SectionTitle('Upcoming holidays'),
-              Card(
+              const SectionHeader('Upcoming holidays'),
+              AppCard(
+                padding: EdgeInsets.zero,
                 child: Column(
                   children: [
-                    for (final h in data.upcomingHolidays.take(3))
-                      ListTile(
-                        leading: const Icon(Icons.celebration_outlined),
-                        title: Text(h.name),
-                        subtitle: Text(fmtShortDate(h.date)),
+                    for (final (i, h) in data.upcomingHolidays.take(3).indexed) ...[
+                      if (i > 0) const Divider(indent: Space.lg, endIndent: Space.lg),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
+                        child: Row(
+                          children: [
+                            DateBadge(date: h.date, caption: fmtMonthShort(h.date)),
+                            const SizedBox(width: Space.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(h.name, style: Theme.of(context).textTheme.titleSmall),
+                                  Text(fmtShortDate(h.date),
+                                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -230,6 +271,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Placeholder in the shape of the Home content.
+class _HomeSkeleton extends StatelessWidget {
+  const _HomeSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget pair(double height) => Row(
+          children: [
+            Expanded(child: SkeletonBox(height: height, radius: Radii.card)),
+            const SizedBox(width: Space.md),
+            Expanded(child: SkeletonBox(height: height, radius: Radii.card)),
+          ],
+        );
+    return LoadingSkeleton(
+      padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xl),
+      children: [
+        const SkeletonBox(height: 168, radius: Radii.card),
+        pair(96),
+        const SkeletonBox(width: 120, height: 20),
+        pair(68),
+        pair(68),
+        const SkeletonBox(width: 160, height: 20),
+        const SkeletonBox(height: 140, radius: Radii.card),
+      ],
     );
   }
 }
@@ -256,40 +325,57 @@ class _TodayCard extends StatelessWidget {
     }
 
     return Card(
-      color: scheme.primaryContainer,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.today, color: scheme.onPrimaryContainer),
-                  const SizedBox(width: 8),
-                  Text('Today · ${fmtShortDate(DateTime.now())}',
-                      style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600)),
-                  const Spacer(),
-                  if (today?.late == true)
-                    StatusChip('LATE', label: today!.lateExcused ? 'Late (excused)' : 'Late ${today.lateMinutes ?? ''}m'),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(status,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(color: scheme.onPrimaryContainer, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _TimeBlock(label: 'Check in', value: fmtTime(today?.checkIn), color: scheme.onPrimaryContainer),
-                  _TimeBlock(label: 'Check out', value: fmtTime(today?.checkOut), color: scheme.onPrimaryContainer),
-                  _TimeBlock(label: 'Worked', value: fmtHours(today?.totalHours), color: scheme.onPrimaryContainer),
-                ],
-              ),
-            ],
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [scheme.primaryContainer, scheme.surface],
+          ),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(Space.lg + Space.xs),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const IconBubble(Icons.today, size: 36),
+                    const SizedBox(width: Space.sm),
+                    Expanded(
+                      child: Text('Today · ${fmtShortDate(DateTime.now())}',
+                          style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600)),
+                    ),
+                    if (today?.late == true)
+                      StatusChip(today!.lateExcused ? 'APPROVED' : 'PENDING',
+                          label: today.lateExcused ? 'Late (excused)' : 'Late ${today.lateMinutes ?? ''}m'),
+                  ],
+                ),
+                const SizedBox(height: Space.md),
+                Text(status,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w700)),
+                const SizedBox(height: Space.lg),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: Space.md, horizontal: Space.md),
+                  decoration: BoxDecoration(
+                    color: scheme.surface.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(Radii.control),
+                  ),
+                  child: Row(
+                    children: [
+                      _TimeBlock(label: 'Check in', value: fmtTime(today?.checkIn)),
+                      _TimeBlock(label: 'Check out', value: fmtTime(today?.checkOut)),
+                      _TimeBlock(label: 'Worked', value: fmtHours(today?.totalHours)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -298,21 +384,25 @@ class _TodayCard extends StatelessWidget {
 }
 
 class _TimeBlock extends StatelessWidget {
-  const _TimeBlock({required this.label, required this.value, required this.color});
+  const _TimeBlock({required this.label, required this.value});
 
   final String label;
   final String value;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: color.withValues(alpha: 0.75), fontSize: 12)),
+          Text(label, style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
           const SizedBox(height: 2),
-          Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 16)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: TextStyle(color: scheme.onSurface, fontWeight: FontWeight.w700, fontSize: 16)),
+          ),
         ],
       ),
     );
@@ -330,79 +420,103 @@ class _MonthStats extends StatelessWidget {
     final hours = rows.fold<double>(0, (sum, r) => sum + (r.totalHours ?? 0));
     final late = rows.where((r) => r.late && !r.lateExcused).length;
     final shortHours = rows.fold<double>(0, (sum, r) => sum + (r.shortHours ?? 0));
-    return Row(
+    // Two per row: four across leaves no room for labels at 360dp or large text.
+    return Column(
       children: [
-        _Stat(value: '$present', label: 'Days present'),
-        const SizedBox(width: 8),
-        _Stat(value: fmtHours(hours), label: 'Hours worked'),
-        const SizedBox(width: 8),
-        _Stat(value: '$late', label: 'Late days'),
-        const SizedBox(width: 8),
-        _Stat(value: fmtHours(shortHours), label: 'Short hours'),
+        Row(
+          children: [
+            _Stat(icon: Icons.event_available_outlined, color: AppColors.approved, value: '$present', label: 'Days present'),
+            const SizedBox(width: Space.md),
+            _Stat(icon: Icons.schedule, color: AppColors.red, value: fmtHours(hours), label: 'Hours worked'),
+          ],
+        ),
+        const SizedBox(height: Space.md),
+        Row(
+          children: [
+            _Stat(icon: Icons.alarm, color: AppColors.pending, value: '$late', label: 'Late days'),
+            const SizedBox(width: Space.md),
+            _Stat(icon: Icons.timelapse, color: AppColors.rejected, value: fmtHours(shortHours), label: 'Short hours'),
+          ],
+        ),
       ],
     );
   }
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label});
+  const _Stat({required this.icon, required this.color, required this.value, required this.label});
 
+  final IconData icon;
+  final Color color;
   final String value;
   final String label;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-          child: Column(
-            children: [
-              FittedBox(
-                child: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      child: AppCard(
+        padding: const EdgeInsets.all(Space.md),
+        child: Row(
+          children: [
+            IconBubble(icon, color: color, size: 36),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  ),
+                  Text(label,
+                      maxLines: 2,
+                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _QuotaTile extends StatelessWidget {
-  const _QuotaTile({required this.quota});
+class _QuotaRow extends StatelessWidget {
+  const _QuotaRow({required this.quota});
 
   final LeaveQuota quota;
 
   @override
   Widget build(BuildContext context) {
     final ratio = quota.totalQuota == 0 ? 0.0 : quota.remainingQuota / quota.totalQuota;
-    return SizedBox(
-      width: 150,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.all(Space.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(quota.leaveTypeName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              const Spacer(),
+              Expanded(
+                child: Text(quota.leaveTypeName,
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleSmall),
+              ),
+              const SizedBox(width: Space.sm),
               Text.rich(TextSpan(children: [
                 TextSpan(
                     text: '${quota.remainingQuota}',
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                TextSpan(text: ' / ${quota.totalQuota} left'),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                TextSpan(
+                  text: ' / ${quota.totalQuota} left',
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
               ])),
-              const SizedBox(height: 6),
-              LinearProgressIndicator(value: ratio.clamp(0.0, 1.0), borderRadius: BorderRadius.circular(4)),
             ],
           ),
-        ),
+          const SizedBox(height: Space.sm),
+          LinearProgressIndicator(value: ratio.clamp(0.0, 1.0), borderRadius: BorderRadius.circular(4)),
+        ],
       ),
     );
   }
@@ -417,19 +531,15 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            children: [
-              Icon(icon, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(height: 6),
-              Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-            ],
-          ),
-        ),
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(vertical: Space.lg, horizontal: Space.md),
+      child: Column(
+        children: [
+          IconBubble(icon, size: 44),
+          const SizedBox(height: Space.sm),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }

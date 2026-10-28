@@ -5,12 +5,18 @@ final _shortDate = DateFormat('EEE, d MMM');
 final _time = DateFormat('h:mm a');
 final _dateTime = DateFormat('d MMM yyyy, h:mm a');
 final _month = DateFormat('MMMM yyyy');
+final _monthShort = DateFormat('MMM');
+final _weekdayShort = DateFormat('EEE');
 
 String fmtDate(DateTime? d) => d == null ? '—' : _date.format(d);
 String fmtShortDate(DateTime? d) => d == null ? '—' : _shortDate.format(d);
 String fmtTime(DateTime? d) => d == null ? '—' : _time.format(d);
 String fmtDateTime(DateTime? d) => d == null ? '—' : _dateTime.format(d);
 String fmtMonth(DateTime d) => _month.format(d);
+
+/// "Sep" / "Tue" for date badges.
+String fmtMonthShort(DateTime d) => _monthShort.format(d);
+String fmtWeekdayShort(DateTime d) => _weekdayShort.format(d);
 
 /// 7.5 -> "7h 30m"
 String fmtHours(double? hours) {

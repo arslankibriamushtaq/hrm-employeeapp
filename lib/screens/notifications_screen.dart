@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../session.dart';
+import '../theme/brand.dart';
+import '../theme/tokens.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
 import 'approvals_screen.dart';
@@ -148,6 +150,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   void _push(Widget screen) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
 
+  /// Icon and colour by what the notification is about (same wording rules as the deep
+  /// link). Read notifications go grey so unread ones stand out.
+  (IconData, Color) _iconFor(AppNotification n, ColorScheme scheme) {
+    final (icon, color) = switch (notificationKind(n.message)) {
+      NotificationKind.approvalRequest => (Icons.how_to_reg_outlined, AppColors.pending),
+      NotificationKind.decisionResult => n.message.toLowerCase().contains('was rejected')
+          ? (Icons.cancel_outlined, AppColors.rejected)
+          : (Icons.check_circle_outline, AppColors.approved),
+      NotificationKind.unknown => n.relatedLeaveId != null
+          ? (Icons.event_note_outlined, scheme.primary)
+          : (Icons.notifications_outlined, scheme.primary),
+    };
+    return (icon, n.read ? scheme.onSurfaceVariant : color);
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -161,35 +178,43 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       body: AsyncBody<List<AppNotification>>(
         future: _future,
         onRetry: _refresh,
+        skeleton: LoadingSkeleton.list(count: 6, itemHeight: 72),
         builder: (context, items) => RefreshIndicator(
           onRefresh: _refresh,
           child: items.isEmpty
               ? ListView(children: const [
                   SizedBox(height: 80),
-                  EmptyView(icon: Icons.notifications_none, message: 'You are all caught up.'),
+                  EmptyState(icon: Icons.notifications_none, message: 'You are all caught up.'),
                 ])
               : ListView.separated(
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, __) => const Divider(indent: 72),
                   itemBuilder: (context, i) {
                     final n = items[i];
+                    final (icon, color) = _iconFor(n, scheme);
                     return ListTile(
                       onTap: () => _onTap(n),
                       tileColor: n.read ? null : scheme.primaryContainer.withValues(alpha: 0.35),
-                      leading: CircleAvatar(
-                        backgroundColor: n.read ? scheme.surfaceContainerHighest : scheme.primary,
-                        child: Icon(
-                          n.relatedLeaveId != null ? Icons.event_note : Icons.notifications,
-                          color: n.read ? scheme.onSurfaceVariant : scheme.onPrimary,
-                          size: 20,
-                        ),
-                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.xs),
+                      leading: IconBubble(icon, color: color),
                       title: Text(n.message,
                           style: TextStyle(fontWeight: n.read ? FontWeight.normal : FontWeight.w600)),
-                      subtitle: Text(fmtDateTime(n.createdAt)),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(fmtDateTime(n.createdAt), style: const TextStyle(fontSize: 12)),
+                      ),
                       trailing: _openingId == n.id
                           ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : null,
+                          : n.read
+                              ? null
+                              : Semantics(
+                                  label: 'Unread',
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+                                  ),
+                                ),
                     );
                   },
                 ),

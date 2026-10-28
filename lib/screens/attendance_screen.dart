@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../session.dart';
+import '../theme/brand.dart';
+import '../theme/tokens.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
 
@@ -12,7 +14,7 @@ class _AttendanceData {
   final Map<DateTime, String> holidays;
 }
 
-/// The employee's own attendance (GET /attendance/me), browsed month by month.
+/// The employee's own attendance (GET /me/attendance-records), browsed month by month.
 /// Attendance is recorded by HR / the biometric import - there is no self check-in.
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
@@ -69,6 +71,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       body: AsyncBody<_AttendanceData>(
         future: _future,
         onRetry: _refresh,
+        skeleton: LoadingSkeleton(
+          children: [
+            const SkeletonBox(height: 48),
+            const SkeletonBox(height: 96, radius: Radii.card),
+            for (var i = 0; i < 4; i++) const SkeletonBox(height: 92, radius: Radii.card),
+          ],
+        ),
         builder: (context, data) {
           final rows = data.rows.where((r) => r.date.year == _month.year && r.date.month == _month.month).toList();
           final monthHolidays = data.holidays.entries
@@ -81,51 +90,73 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           return RefreshIndicator(
             onRefresh: _refresh,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xl),
               children: [
                 Row(
                   children: [
-                    IconButton(onPressed: () => _shiftMonth(-1), icon: const Icon(Icons.chevron_left)),
+                    IconButton(
+                      tooltip: 'Previous month',
+                      onPressed: () => _shiftMonth(-1),
+                      icon: const Icon(Icons.chevron_left),
+                    ),
                     Expanded(
                       child: Text(fmtMonth(_month),
                           textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
                     ),
                     IconButton(
+                      tooltip: 'Next month',
                       onPressed: _isCurrentMonth ? null : () => _shiftMonth(1),
                       icon: const Icon(Icons.chevron_right),
                     ),
                   ],
                 ),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Row(
-                      children: [
-                        _Summary(value: '${rows.length}', label: 'Present'),
-                        _Summary(value: fmtHours(hours), label: 'Worked'),
-                        _Summary(value: '$late', label: 'Late'),
-                      ],
-                    ),
+                const SizedBox(height: Space.sm),
+                AppCard(
+                  padding: const EdgeInsets.symmetric(vertical: Space.lg, horizontal: Space.sm),
+                  child: Row(
+                    children: [
+                      _Summary(
+                          icon: Icons.event_available_outlined,
+                          color: AppColors.approved,
+                          value: '${rows.length}',
+                          label: 'Present'),
+                      _Summary(icon: Icons.schedule, color: AppColors.red, value: fmtHours(hours), label: 'Worked'),
+                      _Summary(icon: Icons.alarm, color: AppColors.pending, value: '$late', label: 'Late'),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: Space.lg),
                 if (rows.isEmpty && monthHolidays.isEmpty)
-                  const EmptyView(icon: Icons.event_busy, message: 'No attendance recorded for this month.')
+                  const EmptyState(icon: Icons.event_busy, message: 'No attendance recorded for this month.')
                 else ...[
                   for (final r in rows) ...[
                     _AttendanceTile(row: r, holiday: data.holidays[DateTime(r.date.year, r.date.month, r.date.day)]),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: Space.sm),
                   ],
                   for (final h in monthHolidays.where(
                       (h) => !rows.any((r) => isSameDay(r.date, h.key)))) ...[
-                    Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.celebration_outlined),
-                        title: Text(h.value),
-                        subtitle: Text('Public holiday · ${fmtShortDate(h.key)}'),
+                    AppCard(
+                      padding: const EdgeInsets.all(Space.md + 2),
+                      child: Row(
+                        children: [
+                          DateBadge(date: h.key, caption: fmtWeekdayShort(h.key)),
+                          const SizedBox(width: Space.md + 2),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(h.value, style: Theme.of(context).textTheme.titleSmall),
+                                const SizedBox(height: 2),
+                                Text('Public holiday · ${fmtShortDate(h.key)}',
+                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.celebration_outlined),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: Space.sm),
                   ],
                 ],
               ],
@@ -138,8 +169,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 }
 
 class _Summary extends StatelessWidget {
-  const _Summary({required this.value, required this.label});
+  const _Summary({required this.icon, required this.color, required this.value, required this.label});
 
+  final IconData icon;
+  final Color color;
   final String value;
   final String label;
 
@@ -148,7 +181,12 @@ class _Summary extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          IconBubble(icon, color: color, size: 36),
+          const SizedBox(height: Space.sm),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          ),
           const SizedBox(height: 2),
           Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ],
@@ -167,59 +205,43 @@ class _AttendanceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final missingPunch = row.checkIn == null || row.checkOut == null;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                color: scheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  Text('${row.date.day}',
-                      style: TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.bold, color: scheme.onPrimaryContainer)),
-                  Text(fmtShortDate(row.date).split(',').first,
-                      style: TextStyle(fontSize: 12, color: scheme.onPrimaryContainer)),
-                ],
-              ),
+    return AppCard(
+      padding: const EdgeInsets.all(Space.md + 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DateBadge(date: row.date, caption: fmtWeekdayShort(row.date)),
+          const SizedBox(width: Space.md + 2),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${fmtTime(row.checkIn)}  →  ${fmtTime(row.checkOut)}',
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 2),
+                Text('Worked ${fmtHours(row.totalHours)}', style: TextStyle(color: scheme.onSurfaceVariant)),
+                const SizedBox(height: Space.sm),
+                // One chip style for every flag on the day.
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    if (row.late)
+                      StatusChip(row.lateExcused ? 'APPROVED' : 'PENDING',
+                          label: row.lateExcused ? 'Late (excused)' : 'Late ${row.lateMinutes ?? ''}m')
+                    else if (missingPunch)
+                      const StatusChip('PENDING', label: 'Missing punch')
+                    else
+                      const StatusChip('PRESENT', label: 'Present'),
+                    if ((row.shortHours ?? 0) > 0)
+                      StatusChip('REJECTED', label: 'Short ${fmtHours(row.shortHours)}'),
+                    if (holiday != null) StatusChip(null, label: holiday),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${fmtTime(row.checkIn)}  →  ${fmtTime(row.checkOut)}',
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      Text('Worked ${fmtHours(row.totalHours)}',
-                          style: TextStyle(color: scheme.onSurfaceVariant)),
-                      if ((row.shortHours ?? 0) > 0)
-                        Text('· Short ${fmtHours(row.shortHours)}', style: TextStyle(color: scheme.error)),
-                      if (holiday != null) Text('· $holiday', style: TextStyle(color: scheme.tertiary)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (row.late)
-              StatusChip(row.lateExcused ? 'APPROVED' : 'PENDING',
-                  label: row.lateExcused ? 'Late (excused)' : 'Late ${row.lateMinutes ?? ''}m')
-            else if (missingPunch)
-              const StatusChip('PENDING', label: 'Missing punch')
-            else
-              const StatusChip('PRESENT', label: 'Present'),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

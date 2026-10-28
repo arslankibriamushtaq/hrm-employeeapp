@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../session.dart';
+import '../theme/tokens.dart';
 import '../widgets/brand_logo.dart';
-import '../widgets/common.dart';
 import '../widgets/text_input_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,6 +19,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   bool _busy = false;
 
+  /// Last sign-in failure, shown inline above the button until the next attempt.
+  String? _error;
+
   @override
   void dispose() {
     _email.dispose();
@@ -28,11 +31,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       await AppScope.read(context).login(_email.text, _password.text);
     } catch (e) {
-      if (mounted) showSnack(context, e.toString(), error: true);
+      if (mounted) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -58,6 +64,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
     return Scaffold(
       appBar: AppBar(
         actions: [
@@ -71,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: Space.xl, vertical: Space.lg),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Form(
@@ -79,17 +87,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 16),
                     const Center(child: BrandLogo(width: 220)),
-                    const SizedBox(height: 28),
-                    Text('Welcome back',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: Space.xl + Space.sm),
+                    Text('Welcome back', textAlign: TextAlign.center, style: theme.textTheme.headlineSmall),
+                    const SizedBox(height: Space.xs),
                     Text('Sign in with the account HR created for you',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-                    const SizedBox(height: 32),
+                        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: Space.xl + Space.sm),
                     TextFormField(
                       controller: _email,
                       keyboardType: TextInputType.emailAddress,
@@ -106,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: Space.lg),
                     TextFormField(
                       controller: _password,
                       obscureText: _obscure,
@@ -123,7 +128,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       validator: (v) => (v ?? '').isEmpty ? 'Password is required' : null,
                     ),
-                    const SizedBox(height: 24),
+                    if (_error != null) ...[
+                      const SizedBox(height: Space.lg),
+                      _ErrorBanner(message: _error!),
+                    ],
+                    const SizedBox(height: Space.xl),
                     FilledButton(
                       onPressed: _busy ? null : _submit,
                       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
@@ -132,24 +141,50 @@ class _LoginScreenState extends State<LoginScreen> {
                               height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
                           : const Text('Sign in'),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: Space.md),
                     // Password set/reset happens on the web portal only.
                     Text(
                       'New here? Set your password using the link in your welcome email, then sign in.',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      style: muted,
                     ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Server: ${AppScope.read(context).baseUrl}',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                    ),
+                    const SizedBox(height: Space.xl),
+                    Text('Server: ${AppScope.read(context).baseUrl}', textAlign: TextAlign.center, style: muted),
                   ],
                 ),
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final error = Theme.of(context).colorScheme.error;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(Space.md),
+        decoration: BoxDecoration(
+          color: error.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(Radii.control),
+          border: Border.all(color: error.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline, color: error, size: 20),
+            const SizedBox(width: Space.sm),
+            Expanded(child: Text(message, style: TextStyle(color: error, fontWeight: FontWeight.w500))),
+          ],
         ),
       ),
     );

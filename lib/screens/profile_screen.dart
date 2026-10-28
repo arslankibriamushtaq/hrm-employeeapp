@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../session.dart';
+import '../theme/tokens.dart';
+import '../widgets/common.dart';
 import 'approvals_screen.dart';
 import 'holidays_screen.dart';
 import 'notifications_screen.dart';
@@ -50,88 +52,85 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final session = AppScope.of(context);
     final user = session.user;
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final email = user?.email ?? '';
+    final role = user?.roleName ?? user?.role ?? '';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(Space.lg),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: scheme.primary,
-                    child: Text(
-                      email.isEmpty ? '?' : email[0].toUpperCase(),
-                      style: TextStyle(fontSize: 26, color: scheme.onPrimary, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(email, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                        const SizedBox(height: 4),
-                        Text(user?.roleName ?? user?.role ?? '',
-                            style: TextStyle(color: scheme.onSurfaceVariant)),
+          AppCard(
+            padding: const EdgeInsets.all(Space.lg + Space.xs),
+            child: Row(
+              children: [
+                InitialsAvatar(email, radius: 30),
+                const SizedBox(width: Space.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(email, style: theme.textTheme.titleMedium),
+                      if (role.isNotEmpty) ...[
+                        const SizedBox(height: Space.sm),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: Space.xs),
+                          decoration: BoxDecoration(
+                            color: scheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(role,
+                              style: TextStyle(
+                                  color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600, fontSize: 12)),
+                        ),
                       ],
-                    ),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Space.lg),
+          _Group(
+            children: [
+              _SettingsTile(
+                icon: Icons.notifications_outlined,
+                title: 'Notifications',
+                onTap: () => _push(context, const NotificationsScreen()),
               ),
-            ),
+              if (_approver case final approver?)
+                _SettingsTile(
+                  icon: Icons.how_to_reg_outlined,
+                  title: approver.title,
+                  subtitle: approver.subtitle,
+                  onTap: () => _push(context, ApprovalsScreen(kind: approver)),
+                ),
+              _SettingsTile(
+                icon: Icons.celebration_outlined,
+                title: 'Public holidays',
+                onTap: () => _push(context, const HolidaysScreen()),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.notifications_outlined),
-                  title: const Text('Notifications'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _push(context, const NotificationsScreen()),
-                ),
-                if (_approver case final approver?)
-                  ListTile(
-                    leading: const Icon(Icons.how_to_reg_outlined),
-                    title: Text(approver.title),
-                    subtitle: Text(approver.subtitle),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _push(context, ApprovalsScreen(kind: approver)),
-                  ),
-                ListTile(
-                  leading: const Icon(Icons.celebration_outlined),
-                  title: const Text('Public holidays'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _push(context, const HolidaysScreen()),
-                ),
-              ],
-            ),
+          const SizedBox(height: Space.lg),
+          _Group(
+            children: [
+              _SettingsTile(
+                icon: Icons.dns_outlined,
+                title: 'Server',
+                subtitle: session.baseUrl,
+              ),
+              _SettingsTile(
+                icon: Icons.logout,
+                title: 'Sign out',
+                color: scheme.error,
+                onTap: () => _confirmLogout(context),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.dns_outlined),
-                  title: const Text('Server'),
-                  subtitle: Text(session.baseUrl),
-                ),
-                ListTile(
-                  leading: Icon(Icons.logout, color: scheme.error),
-                  title: Text('Sign out', style: TextStyle(color: scheme.error)),
-                  onTap: () => _confirmLogout(context),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: Space.xl),
           Text(
             'To change your password, please contact HR.',
             textAlign: TextAlign.center,
@@ -139,6 +138,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A card of settings rows separated by inset dividers.
+class _Group extends StatelessWidget {
+  const _Group({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) const Divider(indent: 68),
+            children[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({required this.icon, required this.title, this.subtitle, this.onTap, this.color});
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onTap;
+
+  /// Tints the icon and title (Sign out uses the error colour).
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: IconBubble(icon, color: color ?? scheme.onSurfaceVariant, size: 36),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: color)),
+      subtitle: subtitle == null ? null : Text(subtitle!),
+      trailing: onTap == null || color != null ? null : const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
 }

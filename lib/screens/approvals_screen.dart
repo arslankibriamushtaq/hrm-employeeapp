@@ -6,6 +6,7 @@ import '../api/api_client.dart';
 import '../models.dart';
 import '../session.dart';
 import '../theme/brand.dart';
+import '../theme/tokens.dart';
 import '../widgets/common.dart';
 import '../widgets/text_input_dialog.dart';
 import 'leave_screen.dart';
@@ -258,23 +259,30 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     return AsyncBody<List<LeaveRequest>>(
       future: _pending,
       onRetry: _refreshPending,
+      skeleton: LoadingSkeleton.list(itemHeight: 220),
       builder: (context, requests) => RefreshIndicator(
         onRefresh: _refreshPending,
         child: requests.isEmpty
             ? ListView(children: const [
                 SizedBox(height: 80),
-                EmptyView(icon: Icons.task_alt, message: 'Nothing waiting for your approval.'),
+                EmptyState(icon: Icons.task_alt, message: 'Nothing waiting for your approval.'),
               ])
             // Built eagerly (not .separated) so a deep-linked card exists to scroll to.
             : ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(Space.lg),
                 children: [
                   for (final r in requests) ...[
                     _card(
                       r,
                       balance: BalanceView.pending,
                       footer: _busyIds.contains(r.id)
-                          ? const Center(child: CircularProgressIndicator())
+                          // Same height as the buttons so the card does not jump.
+                          ? const SizedBox(
+                              height: 48,
+                              child: Center(
+                                child: SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2.5)),
+                              ),
+                            )
                           : Row(
                               children: [
                                 Expanded(
@@ -288,7 +296,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: Space.md),
                                 Expanded(
                                   // Green, not the brand red, so Approve never reads as Reject.
                                   child: FilledButton.icon(
@@ -304,7 +312,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
                               ],
                             ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: Space.md),
                   ],
                 ],
               ),
@@ -316,6 +324,7 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     return AsyncBody<List<_Decided>>(
       future: _decided,
       onRetry: _refreshDecided,
+      skeleton: LoadingSkeleton.list(itemHeight: 180),
       builder: (context, all) {
         final approved = all.where((d) => d.myDecision == 'APPROVED').toList();
         final rejected = all.where((d) => d.myDecision == 'REJECTED').toList();
@@ -339,27 +348,27 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         return RefreshIndicator(
           onRefresh: _refreshDecided,
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(Space.lg),
             children: [
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: Space.sm,
+                runSpacing: Space.sm,
                 children: [
                   chip(_Filter.all, 'All', all.length),
                   chip(_Filter.approved, 'Approved', approved.length),
                   chip(_Filter.rejected, 'Rejected', rejected.length),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: Space.lg),
               if (shown.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 48),
-                  child: EmptyView(icon: Icons.history, message: emptyMessage),
+                  child: EmptyState(icon: Icons.history, message: emptyMessage),
                 )
               else
                 for (final d in shown) ...[
                   _card(d.request, balance: BalanceView.current),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: Space.md),
                 ],
             ],
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../session.dart';
+import '../theme/tokens.dart';
 import '../utils/format.dart';
 import '../widgets/common.dart';
 
@@ -82,32 +83,45 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Apply for leave')),
       body: AsyncBody<List<LeaveQuota>>(
         future: _quotas,
         onRetry: () => setState(() { _quotas = AppScope.read(context).api.myQuotas(DateTime.now().year); }),
+        skeleton: const LoadingSkeleton(
+          children: [
+            SkeletonBox(width: 100, height: 18),
+            SkeletonBox(height: 56),
+            SkeletonBox(width: 80, height: 18),
+            SkeletonBox(height: 56),
+            SkeletonBox(width: 120, height: 18),
+            SkeletonBox(height: 120),
+          ],
+        ),
         builder: (context, quotas) {
           if (quotas.isEmpty) {
             return const Center(
-              child: EmptyView(
+              child: EmptyState(
                 icon: Icons.info_outline,
                 message: 'No leave types are assigned to you yet.\nPlease contact HR.',
               ),
             );
           }
+          final type = _type;
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xl),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const SectionHeader('Leave type'),
                   DropdownButtonFormField<LeaveQuota>(
                     value: _type,
                     isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Leave type',
+                      hintText: 'Select a leave type',
                       prefixIcon: Icon(Icons.category_outlined),
                     ),
                     items: [
@@ -120,7 +134,11 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                     onChanged: (q) => setState(() => _type = q),
                     validator: (q) => q == null ? 'Select a leave type' : null,
                   ),
-                  const SizedBox(height: 16),
+                  if (type != null) ...[
+                    const SizedBox(height: Space.md),
+                    _BalanceCard(quota: type),
+                  ],
+                  const SectionHeader('Dates'),
                   FormField<DateTimeRange>(
                     validator: (_) => _validateRange(),
                     builder: (field) => InkWell(
@@ -128,44 +146,44 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                         await _pickDates();
                         field.didChange(_range);
                       },
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(Radii.control),
                       child: InputDecorator(
                         decoration: InputDecoration(
-                          labelText: 'Dates',
                           prefixIcon: const Icon(Icons.date_range),
+                          suffixIcon: const Icon(Icons.edit_calendar_outlined),
                           errorText: field.errorText,
                         ),
                         child: Text(
                           _range == null ? 'Tap to select' : fmtDateRange(_range!.start, _range!.end),
+                          style: _range == null
+                              ? TextStyle(color: scheme.onSurfaceVariant)
+                              : const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(12, 6, 12, 0),
-                    child: Text('Weekends and public holidays are not counted.',
-                        style: TextStyle(fontSize: 12)),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(Space.xs, Space.sm, Space.xs, 0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: scheme.onSurfaceVariant),
+                        const SizedBox(width: Space.xs + 2),
+                        Expanded(
+                          child: Text('Weekends and public holidays are not counted.',
+                              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SectionHeader('Reason (optional)'),
                   TextFormField(
                     controller: _reason,
                     maxLines: 4,
                     maxLength: 500,
-                    decoration: const InputDecoration(
-                      labelText: 'Reason (optional)',
-                      alignLabelWithHint: true,
-                    ),
+                    decoration: const InputDecoration(alignLabelWithHint: true),
                   ),
-                  if (_type != null && _type!.remainingQuota <= 0)
-                    Card(
-                      color: Theme.of(context).colorScheme.errorContainer,
-                      child: const ListTile(
-                        leading: Icon(Icons.warning_amber),
-                        title: Text('You have no balance left for this leave type'),
-                        subtitle: Text('The request may be rejected automatically on approval.'),
-                      ),
-                    ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: Space.lg),
                   FilledButton.icon(
                     onPressed: _busy ? null : _submit,
                     style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
@@ -179,6 +197,54 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// The chosen leave type's balance, plus the existing warning when nothing is left.
+class _BalanceCard extends StatelessWidget {
+  const _BalanceCard({required this.quota});
+
+  final LeaveQuota quota;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final empty = quota.remainingQuota <= 0;
+    final ratio = quota.totalQuota == 0 ? 0.0 : quota.remainingQuota / quota.totalQuota;
+    return AppCard(
+      color: empty ? scheme.errorContainer : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconBubble(empty ? Icons.warning_amber : Icons.account_balance_wallet_outlined,
+                  color: empty ? scheme.error : null, size: 36),
+              const SizedBox(width: Space.md),
+              Expanded(
+                child: empty
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('You have no balance left for this leave type',
+                              style: TextStyle(fontWeight: FontWeight.w600, color: scheme.onErrorContainer)),
+                          const SizedBox(height: 2),
+                          Text('The request may be rejected automatically on approval.',
+                              style: TextStyle(color: scheme.onErrorContainer)),
+                        ],
+                      )
+                    : Text('${quota.remainingQuota} of ${quota.totalQuota} days left',
+                        style: Theme.of(context).textTheme.titleSmall),
+              ),
+            ],
+          ),
+          if (!empty) ...[
+            const SizedBox(height: Space.md),
+            LinearProgressIndicator(value: ratio.clamp(0.0, 1.0), borderRadius: BorderRadius.circular(4)),
+          ],
+        ],
       ),
     );
   }
