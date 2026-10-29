@@ -407,7 +407,7 @@ bool _exceedsBalance(LeaveRequest r) {
 }
 
 String _exceedsMessage(LeaveRequest r) =>
-    'Balance se zyada: ${r.totalDays} din maange, sirf ${r.quota!.remainingQuota} bache hain';
+    'Exceeds balance: ${r.totalDays} days requested, only ${r.quota!.remainingQuota} left';
 
 List<Widget> _balanceSection(BuildContext context, LeaveRequest r, BalanceView view) {
   final title = view == BalanceView.current ? 'Current balance' : 'Leave balance';
@@ -434,9 +434,9 @@ List<Widget> _balanceSection(BuildContext context, LeaveRequest r, BalanceView v
           InfoRow('Used', '${q.usedQuota} days'),
           InfoRow('Remaining', '${q.remainingQuota} days'),
           if (view == BalanceView.pending) ...[
-            InfoRow('Is request ke din', days?.toString() ?? '—'),
+            InfoRow('Days in this request', days?.toString() ?? '—'),
             InfoRow(
-              'Manzoori ke baad bachenge',
+              'Left after approval',
               days == null ? '—' : '${q.remainingQuota - days} days',
               valueColor: over ? error : null,
             ),

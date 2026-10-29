@@ -91,7 +91,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       await _openLeave(notificationKind(n.message), leaveId);
     } catch (e) {
       debugPrint('Notifications: loading leave request $leaveId failed: $e');
-      if (mounted) showSnack(context, 'Request load nahi ho saki, dobara try karein', error: true);
+      if (mounted) showSnack(context, 'Could not load the request. Please try again.', error: true);
     } finally {
       if (mounted) setState(() => _openingId = null);
     }
@@ -137,13 +137,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (kind) {
       case NotificationKind.approvalRequest:
         if (!await openApprovals() && mounted) {
-          showSnack(context, 'Yeh request ab aap ke paas nahi hai (shayad pehle hi decide ho chuki hai)');
+          showSnack(context, 'This request is no longer available to you (it may have already been decided).');
         }
       case NotificationKind.decisionResult:
-        if (!await openMine() && mounted) showSnack(context, 'Yeh leave request nahi mili');
+        if (!await openMine() && mounted) showSnack(context, 'This leave request could not be found.');
       case NotificationKind.unknown:
         if (!await openMine() && !await openApprovals() && mounted) {
-          showSnack(context, 'Yeh leave request nahi mili');
+          showSnack(context, 'This leave request could not be found.');
         }
     }
   }

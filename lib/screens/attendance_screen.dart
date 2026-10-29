@@ -228,7 +228,7 @@ class _AttendanceTile extends StatelessWidget {
                   children: [
                     if (row.late)
                       StatusChip(row.lateExcused ? 'APPROVED' : 'PENDING',
-                          label: row.lateExcused ? 'Late (excused)' : 'Late ${row.lateMinutes ?? ''}m')
+                          label: row.lateExcused ? 'Late (excused)' : fmtLate(row.lateMinutes))
                     else if (missingPunch)
                       const StatusChip('PENDING', label: 'Missing punch')
                     else

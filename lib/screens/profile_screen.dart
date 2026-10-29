@@ -118,11 +118,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _Group(
             children: [
               _SettingsTile(
-                icon: Icons.dns_outlined,
-                title: 'Server',
-                subtitle: session.baseUrl,
-              ),
-              _SettingsTile(
                 icon: Icons.logout,
                 title: 'Sign out',
                 color: scheme.error,

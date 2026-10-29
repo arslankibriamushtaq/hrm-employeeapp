@@ -51,7 +51,7 @@ class _EmployeeAppState extends State<EmployeeApp> {
     return AppScope(
       session: widget.session,
       child: MaterialApp(
-        title: 'HR Employee',
+        title: 'MYTM HRM',
         debugShowCheckedModeBanner: false,
         navigatorKey: _navigatorKey,
         // Light only: the MYTM theme has no dark variant.

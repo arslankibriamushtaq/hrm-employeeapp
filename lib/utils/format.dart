@@ -28,6 +28,14 @@ String fmtHours(double? hours) {
   return m == 0 ? '${h}h' : '${h}h ${m}m';
 }
 
+/// Late chip text, reusing [fmtHours]. Null, 0 or negative minutes give plain "Late".
+/// 1 -> "Late 1m", 45 -> "Late 45m", 59 -> "Late 59m", 60 -> "Late 1h", 61 -> "Late 1h 1m",
+/// 93 -> "Late 1h 33m", 120 -> "Late 2h", 150 -> "Late 2h 30m", 605 -> "Late 10h 5m".
+String fmtLate(int? minutes) {
+  final m = minutes ?? 0;
+  return m > 0 ? 'Late ${fmtHours(m / 60)}' : 'Late';
+}
+
 String fmtDateRange(DateTime start, DateTime end) {
   if (isSameDay(start, end)) return fmtDate(start);
   if (start.year == end.year) {

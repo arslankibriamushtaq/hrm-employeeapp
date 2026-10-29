@@ -148,8 +148,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       textAlign: TextAlign.center,
                       style: muted,
                     ),
-                    const SizedBox(height: Space.xl),
-                    Text('Server: ${AppScope.read(context).baseUrl}', textAlign: TextAlign.center, style: muted),
                   ],
                 ),
               ),

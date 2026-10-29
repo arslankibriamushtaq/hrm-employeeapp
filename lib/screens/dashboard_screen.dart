@@ -317,7 +317,7 @@ class _TodayCard extends StatelessWidget {
     if (data.attendanceError != null) {
       status = 'Could not load attendance';
     } else if (today == null) {
-      status = 'No attendance record for today yet';
+      status = 'No record for today';
     } else if (today.checkOut == null) {
       status = 'Checked in';
     } else {
@@ -350,7 +350,7 @@ class _TodayCard extends StatelessWidget {
                     ),
                     if (today?.late == true)
                       StatusChip(today!.lateExcused ? 'APPROVED' : 'PENDING',
-                          label: today.lateExcused ? 'Late (excused)' : 'Late ${today.lateMinutes ?? ''}m'),
+                          label: today.lateExcused ? 'Late (excused)' : fmtLate(today.lateMinutes)),
                   ],
                 ),
                 const SizedBox(height: Space.md),

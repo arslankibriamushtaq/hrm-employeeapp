@@ -334,9 +334,9 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
           _Filter.rejected => rejected,
         };
         final emptyMessage = switch (_filter) {
-          _Filter.all => 'Abhi tak koi request decide nahi ki',
-          _Filter.approved => 'Abhi tak koi request approve nahi ki',
-          _Filter.rejected => 'Abhi tak koi request reject nahi ki',
+          _Filter.all => "You haven't decided any requests yet.",
+          _Filter.approved => "You haven't approved any requests yet.",
+          _Filter.rejected => "You haven't rejected any requests yet.",
         };
 
         Widget chip(_Filter f, String label, int count) => ChoiceChip(
