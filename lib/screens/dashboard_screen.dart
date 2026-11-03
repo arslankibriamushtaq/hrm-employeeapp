@@ -323,6 +323,19 @@ class _TodayCard extends StatelessWidget {
     } else {
       status = 'Day complete';
     }
+    // Short already includes late time, so a day shows Late until check-out and only
+    // Short after it. shortHours is in hours and is 0.0 before check-out.
+    StatusChip? badge;
+    if (today != null && today.checkOut == null) {
+      if (today.late && (today.lateMinutes ?? 0) > 0) {
+        badge = StatusChip(today.lateExcused ? 'APPROVED' : 'PENDING',
+            label: today.lateExcused ? 'Late (excused)' : fmtLate(today.lateMinutes));
+      }
+    } else if (today != null) {
+      final shortHours = today.shortHours ?? 0;
+      // The red tone keeps Short apart from the orange Late chip.
+      if ((shortHours * 60).round() > 0) badge = StatusChip('ABSENT', label: 'Short ${fmtHours(shortHours)}');
+    }
 
     return Card(
       child: Ink(
@@ -348,9 +361,7 @@ class _TodayCard extends StatelessWidget {
                       child: Text('Today · ${fmtShortDate(DateTime.now())}',
                           style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600)),
                     ),
-                    if (today?.late == true)
-                      StatusChip(today!.lateExcused ? 'APPROVED' : 'PENDING',
-                          label: today.lateExcused ? 'Late (excused)' : fmtLate(today.lateMinutes)),
+                    if (badge != null) badge,
                   ],
                 ),
                 const SizedBox(height: Space.md),
